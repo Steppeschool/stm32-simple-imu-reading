@@ -1,0 +1,9 @@
+../Core/Src/mag/lis3mdl_drv.c:24:33:to_lis	16	static
+../Core/Src/mag/lis3mdl_drv.c:29:15:reg_read	32	static
+../Core/Src/mag/lis3mdl_drv.c:34:15:reg_write_byte	24	static
+../Core/Src/mag/lis3mdl_drv.c:41:15:lis3mdl_init	24	static
+../Core/Src/mag/lis3mdl_drv.c:64:15:lis3mdl_deinit	16	static
+../Core/Src/mag/lis3mdl_drv.c:69:15:lis3mdl_read_raw	24	static
+../Core/Src/mag/lis3mdl_drv.c:87:15:lis3mdl_data_ready	24	static
+../Core/Src/mag/lis3mdl_drv.c:95:15:lis3mdl_who_am_i	16	static
+../Core/Src/mag/lis3mdl_drv.c:110:6:LIS3MDL_HandleInit	24	static

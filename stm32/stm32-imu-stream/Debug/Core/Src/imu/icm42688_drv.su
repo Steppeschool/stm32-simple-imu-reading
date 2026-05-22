@@ -1,0 +1,10 @@
+../Core/Src/imu/icm42688_drv.c:30:34:to_icm	16	static
+../Core/Src/imu/icm42688_drv.c:35:15:reg_read	32	static
+../Core/Src/imu/icm42688_drv.c:40:15:reg_write_byte	24	static
+../Core/Src/imu/icm42688_drv.c:47:15:icm42688_init	24	static
+../Core/Src/imu/icm42688_drv.c:67:15:icm42688_deinit	16	static
+../Core/Src/imu/icm42688_drv.c:73:15:icm42688_read_raw	32	static
+../Core/Src/imu/icm42688_drv.c:88:15:icm42688_set_accel_range	24	static
+../Core/Src/imu/icm42688_drv.c:96:15:icm42688_set_gyro_range	24	static
+../Core/Src/imu/icm42688_drv.c:104:15:icm42688_who_am_i	16	static
+../Core/Src/imu/icm42688_drv.c:120:6:ICM42688_HandleInit	24	static

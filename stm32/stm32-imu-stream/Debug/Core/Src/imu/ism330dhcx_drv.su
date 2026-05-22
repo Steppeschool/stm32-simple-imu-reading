@@ -1,0 +1,10 @@
+../Core/Src/imu/ism330dhcx_drv.c:22:36:to_ism	16	static
+../Core/Src/imu/ism330dhcx_drv.c:27:15:reg_read	32	static
+../Core/Src/imu/ism330dhcx_drv.c:32:15:reg_write_byte	24	static
+../Core/Src/imu/ism330dhcx_drv.c:39:15:ism330dhcx_init	32	static
+../Core/Src/imu/ism330dhcx_drv.c:56:15:ism330dhcx_deinit	16	static
+../Core/Src/imu/ism330dhcx_drv.c:62:15:ism330dhcx_read_raw	32	static
+../Core/Src/imu/ism330dhcx_drv.c:77:15:ism330dhcx_set_accel_range	24	static
+../Core/Src/imu/ism330dhcx_drv.c:85:15:ism330dhcx_set_gyro_range	24	static
+../Core/Src/imu/ism330dhcx_drv.c:93:15:ism330dhcx_who_am_i	16	static
+../Core/Src/imu/ism330dhcx_drv.c:109:6:ISM330DHCX_HandleInit	24	static

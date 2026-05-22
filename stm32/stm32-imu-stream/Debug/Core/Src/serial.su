@@ -1,0 +1,2 @@
+../Core/Src/serial.c:9:13:serial_send_data	8	static
+../Core/Src/serial.c:14:6:serial_send_packet	16	static

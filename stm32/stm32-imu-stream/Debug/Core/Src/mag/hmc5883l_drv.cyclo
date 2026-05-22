@@ -1,0 +1,9 @@
+../Core/Src/mag/hmc5883l_drv.c:18:34:to_hmc	1
+../Core/Src/mag/hmc5883l_drv.c:23:15:reg_read	1
+../Core/Src/mag/hmc5883l_drv.c:28:15:reg_write_byte	1
+../Core/Src/mag/hmc5883l_drv.c:35:15:hmc5883l_init	8
+../Core/Src/mag/hmc5883l_drv.c:55:15:hmc5883l_deinit	1
+../Core/Src/mag/hmc5883l_drv.c:60:15:hmc5883l_read_raw	2
+../Core/Src/mag/hmc5883l_drv.c:73:15:hmc5883l_data_ready	2
+../Core/Src/mag/hmc5883l_drv.c:81:15:hmc5883l_who_am_i	1
+../Core/Src/mag/hmc5883l_drv.c:97:6:HMC5883L_HandleInit	1
