@@ -1,0 +1,15 @@
+../Core/Inc/mag/mag_hal.h:48:22:MAG_Init	1
+../Core/Src/imu/mpu9250_drv.c:40:33:to_mpu	1
+../Core/Src/imu/mpu9250_drv.c:45:15:reg_read	1
+../Core/Src/imu/mpu9250_drv.c:50:15:reg_write_byte	1
+../Core/Src/imu/mpu9250_drv.c:59:15:mpu9250_init	14
+../Core/Src/imu/mpu9250_drv.c:98:15:mpu9250_deinit	1
+../Core/Src/imu/mpu9250_drv.c:103:15:mpu9250_read_raw	2
+../Core/Src/imu/mpu9250_drv.c:120:15:mpu9250_set_accel_range	2
+../Core/Src/imu/mpu9250_drv.c:128:15:mpu9250_set_gyro_range	2
+../Core/Src/imu/mpu9250_drv.c:136:15:mpu9250_who_am_i	1
+../Core/Src/imu/mpu9250_drv.c:145:15:ak8963_init	4
+../Core/Src/imu/mpu9250_drv.c:167:15:ak8963_deinit	1
+../Core/Src/imu/mpu9250_drv.c:173:15:ak8963_read_raw	2
+../Core/Src/imu/mpu9250_drv.c:187:15:ak8963_who_am_i	1
+../Core/Src/imu/mpu9250_drv.c:216:6:MPU9250_HandleInit	1

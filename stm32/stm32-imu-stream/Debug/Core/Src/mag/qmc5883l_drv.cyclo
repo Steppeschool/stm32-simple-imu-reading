@@ -1,9 +1,0 @@
-../Core/Src/mag/qmc5883l_drv.c:17:34:to_qmc	1
-../Core/Src/mag/qmc5883l_drv.c:22:15:reg_read	1
-../Core/Src/mag/qmc5883l_drv.c:27:15:reg_write_byte	1
-../Core/Src/mag/qmc5883l_drv.c:34:15:qmc5883l_init	3
-../Core/Src/mag/qmc5883l_drv.c:51:15:qmc5883l_deinit	1
-../Core/Src/mag/qmc5883l_drv.c:57:15:qmc5883l_read_raw	2
-../Core/Src/mag/qmc5883l_drv.c:69:15:qmc5883l_data_ready	2
-../Core/Src/mag/qmc5883l_drv.c:77:15:qmc5883l_who_am_i	1
-../Core/Src/mag/qmc5883l_drv.c:92:6:QMC5883L_HandleInit	1

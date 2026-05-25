@@ -4,6 +4,5 @@
 ../Core/Src/mag/lis3mdl_drv.c:41:15:lis3mdl_init	9
 ../Core/Src/mag/lis3mdl_drv.c:64:15:lis3mdl_deinit	1
 ../Core/Src/mag/lis3mdl_drv.c:69:15:lis3mdl_read_raw	2
-../Core/Src/mag/lis3mdl_drv.c:87:15:lis3mdl_data_ready	2
-../Core/Src/mag/lis3mdl_drv.c:95:15:lis3mdl_who_am_i	1
-../Core/Src/mag/lis3mdl_drv.c:110:6:LIS3MDL_HandleInit	1
+../Core/Src/mag/lis3mdl_drv.c:87:15:lis3mdl_who_am_i	1
+../Core/Src/mag/lis3mdl_drv.c:101:6:LIS3MDL_HandleInit	1

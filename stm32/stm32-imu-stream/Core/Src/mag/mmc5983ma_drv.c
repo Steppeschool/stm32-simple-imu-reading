@@ -8,17 +8,25 @@
 #define REG_Z_OUT_0       0x04
 #define REG_Z_OUT_1       0x05
 #define REG_XYZ_OUT_2     0x06   /* bits [1:0] of each axis */
-#define REG_STATUS        0x08   /* Meas_M_Done [0] */
-#define REG_CTRL0         0x09   /* TM_M [0], TM_T [1], SET [3], RESET [4] */
-#define REG_CTRL1         0x0A   /* BW[1:0] */
-#define REG_CTRL2         0x0B   /* CMM_FREQ[2:0], CMM_EN [4] */
-#define REG_PRODUCT_ID    0x2F   /* returns 0x30 */
+#define REG_CTRL0         0x09   /* TM_M [0], SET [3], RESET [4] — write-only */
+#define CTRL0_SET         (1u << 3)
+#define CTRL0_RESET       (1u << 4)
+#define REG_CTRL1         0x0A   /* BW[1:0], SW_RST [7] — write-only */
+#define REG_CTRL2         0x0B   /* CMM_FREQ[2:0], CMM_EN [4] — write-only */
+#define REG_PRODUCT_ID    0x2F   /* returns 0x30 — read-only */
 
 #define PRODUCT_ID_VAL    0x30
-#define STATUS_MEAS_DONE  (1 << 0)
+#define CTRL2_CMM_EN      (1u << 4)
 
-/* Timeout for single measurement poll (ms) */
-#define MEAS_TIMEOUT_MS   10
+/*
+ * Continuous measurement mode (CMM) frequency codes (CTRL2 bits [2:0]).
+ * Chosen to match the bandwidth setting so the sensor is never idle.
+ *   BW_100HZ (8 ms/sample)  → 100 Hz = 0x05
+ *   BW_200HZ (4 ms/sample)  → 200 Hz = 0x06
+ *   BW_400HZ (2 ms/sample)  → 200 Hz = 0x06  (1000 Hz needs BW=3)
+ *   BW_800HZ (0.5 ms/sample)→ 1000 Hz = 0x07
+ */
+static const uint8_t cmm_freq_for_bw[] = { 0x05, 0x06, 0x06, 0x07 };
 
 static int8_t reg_read(mag_handle_t *h, uint8_t reg, uint8_t *buf, uint16_t len)
 {
@@ -38,41 +46,43 @@ static int8_t mmc5983ma_init(mag_handle_t *h)
     if (h->driver->who_am_i(h, &id) != IMU_OK) return IMU_ERR;
     if (id != PRODUCT_ID_VAL) return IMU_ERR;
 
-    /* Soft reset */
+    /* Soft reset — all registers return to 0x00 */
     if (reg_write_byte(h, REG_CTRL1, 0x80) != IMU_OK) return IMU_ERR;
-    h->delay(10);
+    h->delay(50);   /* wait for POR to complete; 20 ms per datasheet, 50 ms margin */
 
-    /* SET operation to remove any residual magnetisation */
-    if (reg_write_byte(h, REG_CTRL0, (1 << 3)) != IMU_OK) return IMU_ERR;
-    h->delay(1);
+    /* Confirm the sensor is back on the bus after reset */
+    if (h->driver->who_am_i(h, &id) != IMU_OK) return IMU_ERR;
+    if (id != PRODUCT_ID_VAL) return IMU_ERR;
+    h->delay(50);
+    /* RESET then SET: put the sensing bridge in a fully known state */
+    if (reg_write_byte(h, REG_CTRL0, CTRL0_RESET) != IMU_OK) return IMU_ERR;
+    h->delay(50);
+    if (reg_write_byte(h, REG_CTRL0, CTRL0_SET)   != IMU_OK) return IMU_ERR;
+    h->delay(50);
 
     /* Configure bandwidth */
     mmc5983ma_handle_t *dev = (mmc5983ma_handle_t *)h;
     if (reg_write_byte(h, REG_CTRL1, (uint8_t)dev->bw) != IMU_OK) return IMU_ERR;
+    h->delay(50);
+
+    /* Enable continuous measurement mode at the matching output rate */
+    uint8_t cmm = CTRL2_CMM_EN | cmm_freq_for_bw[dev->bw & 0x03];
+    if (reg_write_byte(h, REG_CTRL2, cmm) != IMU_OK) return IMU_ERR;
+
+    /* Wait for several CMM measurements to complete before the app starts reading */
+    h->delay(100);
 
     return IMU_OK;
 }
 
 static int8_t mmc5983ma_deinit(mag_handle_t *h)
 {
-    /* Stop any continuous mode */
+    /* Stop continuous mode */
     return reg_write_byte(h, REG_CTRL2, 0x00);
 }
 
 static int8_t mmc5983ma_read_raw(mag_handle_t *h, mag_raw_data_t *out)
 {
-    /* Trigger a single measurement */
-    if (reg_write_byte(h, REG_CTRL0, 0x01) != IMU_OK) return IMU_ERR;
-
-    /* Poll until done (or timeout) */
-    uint8_t status = 0;
-    uint32_t ticks = MEAS_TIMEOUT_MS;
-    while (!(status & STATUS_MEAS_DONE) && ticks--) {
-        h->delay(1);
-        if (reg_read(h, REG_STATUS, &status, 1) != IMU_OK) return IMU_ERR;
-    }
-    if (!(status & STATUS_MEAS_DONE)) return IMU_ERR;
-
     /* Read 7 bytes: X[17:10] X[9:2] Y[17:10] Y[9:2] Z[17:10] Z[9:2] XYZ[1:0] */
     uint8_t buf[7];
     if (reg_read(h, REG_X_OUT_0, buf, 7) != IMU_OK) return IMU_ERR;
@@ -88,17 +98,9 @@ static int8_t mmc5983ma_read_raw(mag_handle_t *h, mag_raw_data_t *out)
 
     /* Remove 2^17 = 131072 zero-field offset, then shift to 16-bit range */
     out->x = (int16_t)((x - 131072) >> 2);
-    out->y = (int16_t)((y - 131072) >> 2);
+    out->y = -(int16_t)((y - 131072) >> 2);
     out->z = (int16_t)((z - 131072) >> 2);
 
-    return IMU_OK;
-}
-
-static int8_t mmc5983ma_data_ready(mag_handle_t *h, uint8_t *ready)
-{
-    uint8_t status;
-    if (reg_read(h, REG_STATUS, &status, 1) != IMU_OK) return IMU_ERR;
-    *ready = (status & STATUS_MEAS_DONE) ? 1u : 0u;
     return IMU_OK;
 }
 
@@ -113,7 +115,6 @@ const mag_driver_t mmc5983ma_driver = {
     .init       = mmc5983ma_init,
     .deinit     = mmc5983ma_deinit,
     .read_raw   = mmc5983ma_read_raw,
-    .data_ready = mmc5983ma_data_ready,
     .who_am_i   = mmc5983ma_who_am_i,
 };
 

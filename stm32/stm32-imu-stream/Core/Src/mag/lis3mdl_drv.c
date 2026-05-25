@@ -70,25 +70,17 @@ static int8_t lis3mdl_read_raw(mag_handle_t *h, mag_raw_data_t *out)
 {
     uint8_t buf[6];
     /*
-     * SPI: set MSB of register address for auto-increment.
-     * I2C: auto-increment is always active.
-     * The read callback is responsible for any SPI-specific framing,
-     * so we pass the base register address here unchanged.
+     * LIS3MDL requires the MSB of the sub-address to be set for multi-byte
+     * reads in both I2C and SPI modes to enable auto-increment.
+     * Without this the register pointer stays at OUT_X_L and all six bytes
+     * read the same value.
      */
-    if (reg_read(h, REG_OUT_X_L, buf, 6) != IMU_OK) return IMU_ERR;
+    if (reg_read(h, REG_OUT_X_L | 0x80, buf, 6) != IMU_OK) return IMU_ERR;
 
     out->x = (int16_t)((buf[1] << 8) | buf[0]);
-    out->y = (int16_t)((buf[3] << 8) | buf[2]);
-    out->z = (int16_t)((buf[5] << 8) | buf[4]);
+    out->y = -(int16_t)((buf[3] << 8) | buf[2]);
+    out->z = -(int16_t)((buf[5] << 8) | buf[4]);
 
-    return IMU_OK;
-}
-
-static int8_t lis3mdl_data_ready(mag_handle_t *h, uint8_t *ready)
-{
-    uint8_t status;
-    if (reg_read(h, REG_STATUS, &status, 1) != IMU_OK) return IMU_ERR;
-    *ready = (status & STATUS_ZYXDA) ? 1u : 0u;
     return IMU_OK;
 }
 
@@ -103,7 +95,6 @@ const mag_driver_t lis3mdl_driver = {
     .init       = lis3mdl_init,
     .deinit     = lis3mdl_deinit,
     .read_raw   = lis3mdl_read_raw,
-    .data_ready = lis3mdl_data_ready,
     .who_am_i   = lis3mdl_who_am_i,
 };
 

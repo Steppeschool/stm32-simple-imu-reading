@@ -1,8 +1,7 @@
-../Core/Src/mag/mmc5983ma_drv.c:23:15:reg_read	1
-../Core/Src/mag/mmc5983ma_drv.c:28:15:reg_write_byte	1
-../Core/Src/mag/mmc5983ma_drv.c:35:15:mmc5983ma_init	6
-../Core/Src/mag/mmc5983ma_drv.c:56:15:mmc5983ma_deinit	1
-../Core/Src/mag/mmc5983ma_drv.c:62:15:mmc5983ma_read_raw	7
-../Core/Src/mag/mmc5983ma_drv.c:97:15:mmc5983ma_data_ready	2
-../Core/Src/mag/mmc5983ma_drv.c:105:15:mmc5983ma_who_am_i	1
-../Core/Src/mag/mmc5983ma_drv.c:120:6:MMC5983MA_HandleInit	1
+../Core/Src/mag/mmc5983ma_drv.c:31:15:reg_read	1
+../Core/Src/mag/mmc5983ma_drv.c:36:15:reg_write_byte	1
+../Core/Src/mag/mmc5983ma_drv.c:43:15:mmc5983ma_init	10
+../Core/Src/mag/mmc5983ma_drv.c:78:15:mmc5983ma_deinit	1
+../Core/Src/mag/mmc5983ma_drv.c:84:15:mmc5983ma_read_raw	2
+../Core/Src/mag/mmc5983ma_drv.c:107:15:mmc5983ma_who_am_i	1
+../Core/Src/mag/mmc5983ma_drv.c:121:6:MMC5983MA_HandleInit	1

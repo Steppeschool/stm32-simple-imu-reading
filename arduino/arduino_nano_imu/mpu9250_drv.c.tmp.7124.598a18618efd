@@ -1,0 +1,292 @@
+#include "mpu9250_drv.h"
+
+/* -------------------------------------------------------------------------
+ * MPU9250 register map
+ * ------------------------------------------------------------------------- */
+#define REG_WHO_AM_I     0x75   /* 0x71 = MPU9250, 0x73 = MPU9255 */
+#define REG_CONFIG       0x1A   /* DLPF_CFG[2:0] */
+#define REG_GYRO_CONFIG  0x1B   /* FS_SEL[4:3] */
+#define REG_ACCEL_CONFIG 0x1C   /* FS_SEL[4:3] */
+#define REG_ACCEL_CFG2   0x1D   /* A_DLPF_CFG[2:0] */
+#define REG_I2C_MST_CTRL       0x24   /* I2C master clock divider */
+#define REG_SLV0_ADDR          0x25   /* bit7=R/nW, bits[6:0]=7-bit address */
+#define REG_SLV0_REG           0x26   /* register to access on slave */
+#define REG_SLV0_CTRL          0x27   /* bit7=enable, bits[3:0]=byte count */
+#define REG_ACCEL_XOUT_H       0x3B   /* 14 bytes: accel(6) + temp(2) + gyro(6) */
+#define REG_EXT_DATA_00        0x49   /* shadowed slave data */
+#define REG_I2C_SLV4_CTRL      0x34   /* bits[4:0]=I2C_MST_DLY — read rate divider */
+#define REG_SLV0_DO            0x63   /* write data for slave */
+#define REG_I2C_MST_DELAY_CTRL 0x67   /* bit7=DELAY_ES_SHADOW, bit0=SLV0_DLY_EN */
+#define REG_USER_CTRL          0x6A   /* I2C_MST_EN=bit5, I2C_MST_RST=bit1 */
+#define REG_PWR_MGMT_1         0x6B   /* DEVICE_RESET=bit7, CLKSEL[2:0] */
+
+#define WHO_AM_I_9250    0x71
+#define WHO_AM_I_9255    0x73
+
+/*
+ * Accel FS_SEL [4:3]: 0=+-2g  1=+-4g  2=+-8g  3=+-16g  -> val = range << 3
+ * Gyro  FS_SEL [4:3]: 0=250   1=500   2=1000  3=2000dps -> val = range << 3
+ */
+
+/* -------------------------------------------------------------------------
+ * AK8963 constants (accessed through MPU9250 I2C master)
+ * ------------------------------------------------------------------------- */
+#define AK_ADDR           0x0C
+#define AK_REG_WIA        0x00   /* WHO_AM_I -> 0x48 */
+#define AK_REG_HXL        0x03   /* 7 bytes: HXL HXH HYL HYH HZL HZH ST2 */
+#define AK_REG_CNTL1      0x0A   /* operating mode + output bit width */
+#define AK_REG_CNTL2      0x0B   /* SRST soft-reset bit[0] */
+
+#define AK_WHO_AM_I_VAL        0x48
+#define AK_CNTL1_16BIT_100HZ  0x16   /* 16-bit, continuous mode 2 = 100 Hz */
+#define AK_ST2_HOFL           (1u << 4)   /* bit 4 = HOFL; bit 3 = BITM (always 1 in 16-bit mode) */
+
+/* -------------------------------------------------------------------------
+ * Internal helpers
+ * ------------------------------------------------------------------------- */
+
+static inline mpu9250_handle_t *to_mpu(imu_handle_t *h)
+{
+    return (mpu9250_handle_t *)h;
+}
+
+static int8_t reg_read(imu_handle_t *h, uint8_t reg, uint8_t *buf, uint16_t len)
+{
+    return h->read(reg, buf, len, h->bus_ctx);
+}
+
+static int8_t reg_write_byte(imu_handle_t *h, uint8_t reg, uint8_t val)
+{
+    return h->write(reg, &val, 1, h->bus_ctx);
+}
+
+/* -------------------------------------------------------------------------
+ * AK8963 access through MPU9250 I2C master
+ * ------------------------------------------------------------------------- */
+
+static int8_t ak8963_master_write(mpu9250_handle_t *h, uint8_t reg, uint8_t val)
+{
+    if (reg_write_byte(&h->base, REG_SLV0_ADDR, AK_ADDR)   != IMU_OK) return IMU_ERR;
+    if (reg_write_byte(&h->base, REG_SLV0_REG,  reg)        != IMU_OK) return IMU_ERR;
+    if (reg_write_byte(&h->base, REG_SLV0_DO,   val)        != IMU_OK) return IMU_ERR;
+    if (reg_write_byte(&h->base, REG_SLV0_CTRL, 0x81)       != IMU_OK) return IMU_ERR;
+    h->base.delay(10);
+    return IMU_OK;
+}
+
+static int8_t ak8963_setup_read(mpu9250_handle_t *h, uint8_t reg, uint8_t len)
+{
+    if (reg_write_byte(&h->base, REG_SLV0_ADDR, 0x80 | AK_ADDR) != IMU_OK) return IMU_ERR;
+    if (reg_write_byte(&h->base, REG_SLV0_REG,  reg)             != IMU_OK) return IMU_ERR;
+    if (reg_write_byte(&h->base, REG_SLV0_CTRL, 0x80 | len)      != IMU_OK) return IMU_ERR;
+    h->base.delay(10);
+    return IMU_OK;
+}
+
+/* -------------------------------------------------------------------------
+ * IMU vtable
+ * ------------------------------------------------------------------------- */
+
+static int8_t mpu9250_init(imu_handle_t *base)
+{
+    mpu9250_handle_t *h = to_mpu(base);
+    uint8_t id;
+
+    if (base->driver->who_am_i(base, &id) != IMU_OK) return IMU_ERR;
+    if (id != WHO_AM_I_9250 && id != WHO_AM_I_9255)  return IMU_ERR;
+
+    /* Full device reset */
+    if (reg_write_byte(base, REG_PWR_MGMT_1, 0x80) != IMU_OK) return IMU_ERR;
+    base->delay(100);
+
+    /* Wake up -- select PLL clock for best accuracy */
+    if (reg_write_byte(base, REG_PWR_MGMT_1, 0x01) != IMU_OK) return IMU_ERR;
+    base->delay(10);
+
+    /* Gyro DLPF ~41 Hz bandwidth */
+    if (reg_write_byte(base, REG_CONFIG,     0x03) != IMU_OK) return IMU_ERR;
+    /* Accel DLPF ~41 Hz bandwidth */
+    if (reg_write_byte(base, REG_ACCEL_CFG2, 0x03) != IMU_OK) return IMU_ERR;
+
+    if (base->driver->set_accel_range(base, h->accel_range) != IMU_OK) return IMU_ERR;
+    if (base->driver->set_gyro_range (base, h->gyro_range)  != IMU_OK) return IMU_ERR;
+
+    /* Init embedded AK8963 */
+    if (MAG_Init(&h->mag) != IMU_OK) return IMU_ERR;
+
+    return IMU_OK;
+}
+
+static int8_t mpu9250_deinit(imu_handle_t *base)
+{
+    return reg_write_byte(base, REG_PWR_MGMT_1, 0x40);
+}
+
+static int8_t mpu9250_read_raw(imu_handle_t *base, imu_raw_data_t *out)
+{
+    uint8_t buf[14];
+    if (reg_read(base, REG_ACCEL_XOUT_H, buf, 14) != IMU_OK) return IMU_ERR;
+
+    out->accel_x = (int16_t)((buf[0]  << 8) | buf[1]);
+    out->accel_y = (int16_t)((buf[2]  << 8) | buf[3]);
+    out->accel_z = (int16_t)((buf[4]  << 8) | buf[5]);
+    out->gyro_x  = (int16_t)((buf[8]  << 8) | buf[9]);
+    out->gyro_y  = (int16_t)((buf[10] << 8) | buf[11]);
+    out->gyro_z  = (int16_t)((buf[12] << 8) | buf[13]);
+
+    return IMU_OK;
+}
+
+static int8_t mpu9250_set_accel_range(imu_handle_t *base, imu_accel_range_t range)
+{
+    uint8_t val = (uint8_t)(range << 3);
+    if (reg_write_byte(base, REG_ACCEL_CONFIG, val) != IMU_OK) return IMU_ERR;
+    to_mpu(base)->accel_range = range;
+    return IMU_OK;
+}
+
+static int8_t mpu9250_set_gyro_range(imu_handle_t *base, imu_gyro_range_t range)
+{
+    uint8_t val = (uint8_t)(range << 3);
+    if (reg_write_byte(base, REG_GYRO_CONFIG, val) != IMU_OK) return IMU_ERR;
+    to_mpu(base)->gyro_range = range;
+    return IMU_OK;
+}
+
+static int8_t mpu9250_who_am_i(imu_handle_t *base, uint8_t *id)
+{
+    return reg_read(base, REG_WHO_AM_I, id, 1);
+}
+
+/* -------------------------------------------------------------------------
+ * AK8963 (mag) vtable -- bus_ctx points to the parent mpu9250_handle_t
+ * ------------------------------------------------------------------------- */
+
+static int8_t ak8963_init(mag_handle_t *m)
+{
+    mpu9250_handle_t *h = (mpu9250_handle_t *)m->bus_ctx;
+
+    /* Reset I2C master, then enable it (read-modify-write to preserve other bits) */
+    uint8_t uctrl;
+    if (reg_read(&h->base, REG_USER_CTRL, &uctrl, 1) != IMU_OK) return IMU_ERR;
+    if (reg_write_byte(&h->base, REG_USER_CTRL, uctrl | 0x02) != IMU_OK) return IMU_ERR; /* I2C_MST_RST */
+    h->base.delay(10);
+    if (reg_write_byte(&h->base, REG_USER_CTRL, uctrl | 0x20) != IMU_OK) return IMU_ERR; /* I2C_MST_EN */
+    h->base.delay(10);
+    if (reg_write_byte(&h->base, REG_I2C_MST_CTRL, 0x0D) != IMU_OK) return IMU_ERR; /* 400 kHz */
+    h->base.delay(10);
+
+    /*
+     * DELAY_ES_SHADOW (bit7): only latch EXT_DATA registers once all slave
+     * reads for a sample period are complete — prevents the host reading a
+     * mix of old and new AK8963 bytes when a burst update is in progress.
+     * I2C_SLV0_DLY_EN (bit0): apply the I2C_MST_DLY divider to SLV0.
+     *
+     * I2C_MST_DLY = 4 in REG_I2C_SLV4_CTRL → SLV0 is read every (1+4)=5
+     * gyro samples.  Default gyro rate = 1 kHz → AK8963 polled at 200 Hz,
+     * which comfortably oversamples the 100 Hz sensor output.
+     */
+    if (reg_write_byte(&h->base, REG_I2C_SLV4_CTRL,      4)    != IMU_OK) return IMU_ERR;
+    if (reg_write_byte(&h->base, REG_I2C_MST_DELAY_CTRL, 0x81) != IMU_OK) return IMU_ERR;
+    h->base.delay(10);
+
+    /* AK8963 soft reset */
+    if (ak8963_master_write(h, AK_REG_CNTL2, 0x01) != IMU_OK) return IMU_ERR;
+    h->base.delay(10);
+
+    /* Power down before mode change (required by AK8963 datasheet) */
+    if (ak8963_master_write(h, AK_REG_CNTL1, 0x00) != IMU_OK) return IMU_ERR;
+    h->base.delay(10);
+
+    /* 16-bit continuous measurement at 100 Hz */
+    if (ak8963_master_write(h, AK_REG_CNTL1, AK_CNTL1_16BIT_100HZ) != IMU_OK) return IMU_ERR;
+    h->base.delay(10);
+
+    /* Configure SLV0 to continuously shadow 7 bytes (HXL..ST2) */
+    if (ak8963_setup_read(h, AK_REG_HXL, 7) != IMU_OK) return IMU_ERR;
+
+    return IMU_OK;
+}
+
+static int8_t ak8963_deinit(mag_handle_t *m)
+{
+    mpu9250_handle_t *h = (mpu9250_handle_t *)m->bus_ctx;
+    return ak8963_master_write(h, AK_REG_CNTL1, 0x00);
+}
+
+static int8_t ak8963_read_raw(mag_handle_t *m, mag_raw_data_t *out)
+{
+    mpu9250_handle_t *h = (mpu9250_handle_t *)m->bus_ctx;
+    uint8_t buf[7];
+
+    if (reg_read(&h->base, REG_EXT_DATA_00, buf, 7) != IMU_OK) return IMU_ERR;
+
+    if (buf[6] & AK_ST2_HOFL) return IMU_ERR;
+
+    out->y = -(int16_t)((buf[1] << 8) | buf[0]);
+    out->x = (int16_t)((buf[3] << 8) | buf[2]);
+    out->z = (int16_t)((buf[5] << 8) | buf[4]);
+
+    return IMU_OK;
+}
+
+static int8_t ak8963_who_am_i(mag_handle_t *m, uint8_t *id)
+{
+    mpu9250_handle_t *h = (mpu9250_handle_t *)m->bus_ctx;
+    if (ak8963_setup_read(h, AK_REG_WIA, 1) != IMU_OK) return IMU_ERR;
+    h->base.delay(10);
+    return reg_read(&h->base, REG_EXT_DATA_00, id, 1);
+}
+
+/* -------------------------------------------------------------------------
+ * Public vtables
+ * ------------------------------------------------------------------------- */
+
+const imu_driver_t mpu9250_imu_driver = {
+    .init            = mpu9250_init,
+    .deinit          = mpu9250_deinit,
+    .read_raw        = mpu9250_read_raw,
+    .set_accel_range = mpu9250_set_accel_range,
+    .set_gyro_range  = mpu9250_set_gyro_range,
+    .who_am_i        = mpu9250_who_am_i,
+};
+
+const mag_driver_t mpu9250_mag_driver = {
+    .init       = ak8963_init,
+    .deinit     = ak8963_deinit,
+    .read_raw   = ak8963_read_raw,
+    .who_am_i   = ak8963_who_am_i,
+};
+
+/* -------------------------------------------------------------------------
+ * Public API
+ * ------------------------------------------------------------------------- */
+
+void MPU9250_HandleInit(mpu9250_handle_t *h,
+                        imu_read_fn       read,
+                        imu_write_fn      write,
+                        imu_delay_fn      delay,
+                        void             *bus_ctx,
+                        imu_accel_range_t accel_range,
+                        imu_gyro_range_t  gyro_range)
+{
+    h->base.driver      = &mpu9250_imu_driver;
+    h->base.read        = read;
+    h->base.write       = write;
+    h->base.delay       = delay;
+    h->base.bus_ctx     = bus_ctx;
+    h->base.gyro_bias_x = 0;
+    h->base.gyro_bias_y = 0;
+    h->base.gyro_bias_z = 0;
+    h->accel_range      = accel_range;
+    h->gyro_range       = gyro_range;
+
+    h->mag.driver  = &mpu9250_mag_driver;
+    h->mag.read    = read;
+    h->mag.write   = write;
+    h->mag.delay   = delay;
+    h->mag.bus_ctx = h;   /* AK8963 vtable reaches MPU9250 regs through h */
+    h->mag.bias_x  = 0;
+    h->mag.bias_y  = 0;
+    h->mag.bias_z  = 0;
+}

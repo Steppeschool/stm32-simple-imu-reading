@@ -23,7 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "stdio.h"
 #include "serial.h"
-#include "icm20948_drv.h"
+#include "sensor_config.h"   /* sensor / bus / mag selection — edit that file */
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+/* See Core/Inc/sensor_config.h */
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -42,17 +42,58 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
 SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_tx;
-static icm20948_handle_t imu;
+
 /* USER CODE BEGIN PV */
+
+/* IMU handle */
+#if defined(SENSOR_MPU6050)
+    static mpu6050_handle_t    imu;
+#elif defined(SENSOR_MPU9250)
+    static mpu9250_handle_t    imu;
+#elif defined(SENSOR_ICM42688)
+    static icm42688_handle_t   imu;
+#elif defined(SENSOR_LSM6DSO)
+    static lsm6dso_handle_t    imu;
+#elif defined(SENSOR_ISM330DHCX)
+    static ism330dhcx_handle_t imu;
+#elif defined(SENSOR_ICM20948)
+    static icm20948_handle_t   imu;
+#endif
+
+/* Standalone magnetometer handle */
+#if defined(MAG_LIS3MDL)
+    static lis3mdl_handle_t    mag_handle;
+#elif defined(MAG_MMC5983MA)
+    static mmc5983ma_handle_t  mag_handle;
+#endif
+
+#if MAG_DEFINED
+static uint8_t mag_ok = 0;
+#endif
+
 static imu_raw_data_t imu_data;
 static mag_raw_data_t mag_data;
 uint8_t uart_data[20];
+
+/* I2C bus contexts — 7-bit address shifted left by 1 for STM32 HAL */
+#if defined(SENSOR_BUS_I2C)
+    static uint16_t imu_i2c_addr = SENSOR_I2C_ADDR;
+#endif
+#if defined(SENSOR_MPU9250) && defined(SENSOR_BUS_I2C)
+    static uint16_t ak_i2c_addr  = 0x0C;   /* AK8963 on bypass bus */
+#endif
+#if MAG_STANDALONE
+    static uint16_t mag_i2c_addr = MAG_I2C_ADDR;
+#endif
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -62,6 +103,7 @@ static void MX_DMA_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -71,12 +113,35 @@ static void MX_USART2_UART_Init(void);
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-	if(htim == &htim4)
-	{
-		IMU_ReadRaw((imu_handle_t *)&imu, &imu_data);
-		MAG_ReadCorrected(&imu.mag, &mag_data);
-		serial_send_packet(&imu_data, &mag_data);
-	}
+    if (htim == &htim4)
+    {
+        IMU_ReadRaw((imu_handle_t *)&imu, &imu_data);
+#if MAG_DEFINED
+        if (mag_ok)
+            MAG_ReadCorrected(MAG_HANDLE, &mag_data);
+#endif
+        serial_send_packet(&imu_data, &mag_data);
+    }
+}
+
+static int8_t i2c_read(uint8_t reg, uint8_t *buf, uint16_t len, void *ctx)
+{
+    uint16_t addr = *(uint16_t *)ctx;
+    addr = (addr << 1) + 1;
+    if (HAL_I2C_Master_Transmit(&hi2c1, addr, &reg, 1, 100) != HAL_OK) return -1;
+    if (HAL_I2C_Master_Receive (&hi2c1, addr, buf, len, 100) != HAL_OK) return -1;
+    return 0;
+}
+
+static int8_t i2c_write(uint8_t reg, const uint8_t *buf, uint16_t len, void *ctx)
+{
+    uint16_t addr = *(uint16_t *)ctx;
+    uint8_t  tx[15];   /* 1 reg byte + up to 32 data bytes */
+    addr <<= 1;
+    if (len > 15) return -1;
+    tx[0] = reg;
+    for (uint16_t i = 0; i < len; i++) tx[i + 1] = buf[i];
+    return HAL_I2C_Master_Transmit(&hi2c1, addr, tx, len + 1, 100) == HAL_OK ? 0 : -1;
 }
 
 /* SPI read: assert CS, send register with read-bit set, receive data, deassert CS */
@@ -140,22 +205,65 @@ int main(void)
   MX_SPI2_Init();
   MX_TIM4_Init();
   MX_USART2_UART_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  ICM20948_HandleInit(&imu,
-                      spi2_read, spi2_write, HAL_Delay,
-                      &hspi2,
-                      IMU_ACCEL_RANGE_4G,
-                      IMU_GYRO_RANGE_2000DPS);
 
-  if (IMU_Init((imu_handle_t *)&imu) != IMU_OK) {
-      /* Handle init failure — sensor not responding or wrong WHO_AM_I */
-      Error_Handler();
+  /* Resolve bus callbacks and context */
+#if defined(SENSOR_BUS_SPI)
+  #define IMU_READ_CB   spi2_read
+  #define IMU_WRITE_CB  spi2_write
+  #define IMU_BUS_CTX   ((void *)&hspi2)
+  #define IMU_SPI_MODE  1
+#else  /* I2C or I2C_ALT */
+  #define IMU_READ_CB   i2c_read
+  #define IMU_WRITE_CB  i2c_write
+  #define IMU_BUS_CTX   ((void *)&imu_i2c_addr)
+  #define IMU_SPI_MODE  0
+#endif
+
+  /* IMU HandleInit */
+#if defined(SENSOR_MPU6050)
+  MPU6050_HandleInit(&imu, IMU_READ_CB, IMU_WRITE_CB, HAL_Delay, IMU_BUS_CTX,
+                     MPU6050_ADDR_LOW, CFG_ACCEL_RANGE, CFG_GYRO_RANGE);
+#elif defined(SENSOR_MPU9250)
+  MPU9250_HandleInit(&imu, IMU_READ_CB, IMU_WRITE_CB, HAL_Delay, IMU_BUS_CTX, &ak_i2c_addr,
+                     CFG_ACCEL_RANGE, CFG_GYRO_RANGE);
+#elif defined(SENSOR_ICM42688)
+  ICM42688_HandleInit(&imu, IMU_READ_CB, IMU_WRITE_CB, HAL_Delay, IMU_BUS_CTX,
+                      CFG_ACCEL_RANGE, CFG_GYRO_RANGE);
+#elif defined(SENSOR_LSM6DSO)
+  LSM6DSO_HandleInit(&imu, IMU_READ_CB, IMU_WRITE_CB, HAL_Delay, IMU_BUS_CTX,
+                     CFG_ACCEL_RANGE, CFG_GYRO_RANGE);
+#elif defined(SENSOR_ISM330DHCX)
+  ISM330DHCX_HandleInit(&imu, IMU_READ_CB, IMU_WRITE_CB, HAL_Delay, IMU_BUS_CTX,
+                        CFG_ACCEL_RANGE, CFG_GYRO_RANGE);
+#elif defined(SENSOR_ICM20948)
+  ICM20948_HandleInit(&imu, IMU_READ_CB, IMU_WRITE_CB, HAL_Delay, IMU_BUS_CTX,
+                      CFG_ACCEL_RANGE, CFG_GYRO_RANGE, IMU_SPI_MODE);
+#endif
+
+  if (IMU_Init((imu_handle_t *)&imu) != IMU_OK) Error_Handler();
+  IMU_CalibrateGyro((imu_handle_t *)&imu, 100);
+
+  /* Standalone magnetometer init */
+#if MAG_STANDALONE
+  #if defined(MAG_LIS3MDL)
+    LIS3MDL_HandleInit(&mag_handle, i2c_read, i2c_write, HAL_Delay,
+                       &mag_i2c_addr, LIS3MDL_FS_4G);
+  #elif defined(MAG_MMC5983MA)
+    MMC5983MA_HandleInit(&mag_handle, i2c_read, i2c_write, HAL_Delay,
+                         &mag_i2c_addr, MMC5983MA_BW_200HZ);
+  #endif
+  if (MAG_Init(MAG_HANDLE) == IMU_OK) {
+      mag_ok = 1;
+      MAG_SetBias(MAG_HANDLE, 1450, -1900, 2500); /* replace with measured hard-iron biases */
+      /* LD2 solid ON  = mag init succeeded */
   }
-  MAG_SetBias(&imu.mag, -234, 4, 500);
-
-  /* Optional: calibrate gyro offset registers (keep sensor still for ~1 second) */
-  ICM20948_CalibrateGyro(&imu);
-
+#elif SENSOR_HAS_MAG
+  mag_ok = 1;
+  MAG_SetBias(MAG_HANDLE,136 , -63, -125);     /* replace with measured hard-iron biases */
+#endif
+  HAL_Delay(100);
   HAL_TIM_Base_Start_IT(&htim4);
   /* USER CODE END 2 */
 
@@ -217,6 +325,54 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x10D19EE6;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_DISABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**

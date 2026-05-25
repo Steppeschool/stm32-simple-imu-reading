@@ -1,9 +1,27 @@
-#ifndef INC_MMC5983MA_DRV_H_
+﻿#ifndef INC_MMC5983MA_DRV_H_
 #define INC_MMC5983MA_DRV_H_
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "mag_hal.h"
 
 #define MMC5983MA_ADDR  (0x30 << 1)   /* fixed I2C address */
+
+/*
+ * Bandwidth controls the measurement duration (and noise floor).
+ * Wider BW = faster measurement, higher noise.
+ */
+typedef enum {
+    MMC5983MA_CM_OFF 	= 0,    /* CM off */
+	MMC5983MA_CM_1HZ 	= 1,   	/* 1 Hz */
+    MMC5983MA_CM_10HZ 	= 2,   	/* 10 Hz */
+	MMC5983MA_CM_20HZ 	= 3,   	/* 10 Hz */
+	MMC5983MA_CM_50HZ 	= 4,   	/* 10 Hz */
+	MMC5983MA_CM_100HZ 	= 5,   	/* 10 Hz */
+	MMC5983MA_CM_200HZ 	= 6,   	/* 10 Hz */
+	MMC5983MA_CM_1000HZ = 7,   	/* 10 Hz */
+} mmc5983ma_cm_t;
 
 /*
  * Bandwidth controls the measurement duration (and noise floor).
@@ -15,6 +33,7 @@ typedef enum {
     MMC5983MA_BW_400HZ = 2,   /* 400 Hz, 2 ms */
     MMC5983MA_BW_800HZ = 3,   /* 800 Hz, 0.5 ms */
 } mmc5983ma_bw_t;
+
 
 typedef struct {
     mag_handle_t  base;
@@ -29,5 +48,9 @@ void MMC5983MA_HandleInit(mmc5983ma_handle_t *h,
                           imu_delay_fn        delay,
                           void               *bus_ctx,
                           mmc5983ma_bw_t      bw);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* INC_MMC5983MA_DRV_H_ */

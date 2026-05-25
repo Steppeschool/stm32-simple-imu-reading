@@ -120,8 +120,9 @@ static int8_t icm20948_init(imu_handle_t *base)
     base->delay(100);
     if (write_reg(h, 0, B0_PWR_MGMT_1, 0x01) != IMU_OK) return IMU_ERR;
 
-    /* SPI-only mode */
-    if (write_reg(h, 0, B0_USER_CTRL, 0x10) != IMU_OK) return IMU_ERR;
+    /* SPI-only mode — disable I2C interface when using SPI to prevent bus conflicts */
+    if (h->spi_mode)
+        if (write_reg(h, 0, B0_USER_CTRL, 0x10) != IMU_OK) return IMU_ERR;
 
     /* Accel: max sample rate, LPF on */
     if (write_reg(h, 2, B2_ACCEL_SMPLRT_DIV_1, 0x00) != IMU_OK) return IMU_ERR;
@@ -232,6 +233,7 @@ static int8_t ak09916_init(mag_handle_t *m)
     /* Configure SLV0 to continuously shadow 8 bytes from AK09916 */
     if (ak09916_setup_read(h, AK_MAG_DATA_ONSET, 8) != IMU_OK) return IMU_ERR;
 
+
     return IMU_OK;
 }
 
@@ -255,18 +257,6 @@ static int8_t ak09916_read_raw(mag_handle_t *m, mag_raw_data_t *out)
     out->z = (int16_t)((buf[5] << 8) | buf[4]);
     /* buf[6] = TMPS, buf[7] = ST2 (data latch release) */
 
-    return IMU_OK;
-}
-
-static int8_t ak09916_data_ready(mag_handle_t *m, uint8_t *ready)
-{
-    /*
-     * In continuous mode the SLV0 shadow is updated automatically.
-     * Report always-ready; a data-ready interrupt pin is not wired in the
-     * common abstraction, so poll-based callers can read unconditionally.
-     */
-    (void)m;
-    *ready = 1u;
     return IMU_OK;
 }
 
@@ -296,7 +286,6 @@ const mag_driver_t icm20948_mag_driver = {
     .init       = ak09916_init,
     .deinit     = ak09916_deinit,
     .read_raw   = ak09916_read_raw,
-    .data_ready = ak09916_data_ready,
     .who_am_i   = ak09916_who_am_i,
 };
 
@@ -310,17 +299,22 @@ void ICM20948_HandleInit(icm20948_handle_t *h,
                          imu_delay_fn       delay,
                          void              *bus_ctx,
                          imu_accel_range_t  accel_range,
-                         imu_gyro_range_t   gyro_range)
+                         imu_gyro_range_t   gyro_range,
+                         uint8_t            spi_mode)
 {
     /* IMU base */
-    h->base.driver  = &icm20948_imu_driver;
-    h->base.read    = read;
-    h->base.write   = write;
-    h->base.delay   = delay;
-    h->base.bus_ctx = bus_ctx;
-    h->accel_range  = accel_range;
-    h->gyro_range   = gyro_range;
-    h->current_bank = 0xFF;
+    h->base.driver      = &icm20948_imu_driver;
+    h->base.read        = read;
+    h->base.write       = write;
+    h->base.delay       = delay;
+    h->base.bus_ctx     = bus_ctx;
+    h->base.gyro_bias_x = 0;
+    h->base.gyro_bias_y = 0;
+    h->base.gyro_bias_z = 0;
+    h->accel_range      = accel_range;
+    h->gyro_range       = gyro_range;
+    h->current_bank     = 0xFF;
+    h->spi_mode         = spi_mode;
 
     /*
      * Mag handle: shares the same delay but uses h itself as bus_ctx so

@@ -5,22 +5,16 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Core/Src/mag/hmc5883l_drv.c \
 ../Core/Src/mag/lis3mdl_drv.c \
-../Core/Src/mag/mmc5983ma_drv.c \
-../Core/Src/mag/qmc5883l_drv.c 
+../Core/Src/mag/mmc5983ma_drv.c 
 
 OBJS += \
-./Core/Src/mag/hmc5883l_drv.o \
 ./Core/Src/mag/lis3mdl_drv.o \
-./Core/Src/mag/mmc5983ma_drv.o \
-./Core/Src/mag/qmc5883l_drv.o 
+./Core/Src/mag/mmc5983ma_drv.o 
 
 C_DEPS += \
-./Core/Src/mag/hmc5883l_drv.d \
 ./Core/Src/mag/lis3mdl_drv.d \
-./Core/Src/mag/mmc5983ma_drv.d \
-./Core/Src/mag/qmc5883l_drv.d 
+./Core/Src/mag/mmc5983ma_drv.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -30,7 +24,7 @@ Core/Src/mag/%.o Core/Src/mag/%.su Core/Src/mag/%.cyclo: ../Core/Src/mag/%.c Cor
 clean: clean-Core-2f-Src-2f-mag
 
 clean-Core-2f-Src-2f-mag:
-	-$(RM) ./Core/Src/mag/hmc5883l_drv.cyclo ./Core/Src/mag/hmc5883l_drv.d ./Core/Src/mag/hmc5883l_drv.o ./Core/Src/mag/hmc5883l_drv.su ./Core/Src/mag/lis3mdl_drv.cyclo ./Core/Src/mag/lis3mdl_drv.d ./Core/Src/mag/lis3mdl_drv.o ./Core/Src/mag/lis3mdl_drv.su ./Core/Src/mag/mmc5983ma_drv.cyclo ./Core/Src/mag/mmc5983ma_drv.d ./Core/Src/mag/mmc5983ma_drv.o ./Core/Src/mag/mmc5983ma_drv.su ./Core/Src/mag/qmc5883l_drv.cyclo ./Core/Src/mag/qmc5883l_drv.d ./Core/Src/mag/qmc5883l_drv.o ./Core/Src/mag/qmc5883l_drv.su
+	-$(RM) ./Core/Src/mag/lis3mdl_drv.cyclo ./Core/Src/mag/lis3mdl_drv.d ./Core/Src/mag/lis3mdl_drv.o ./Core/Src/mag/lis3mdl_drv.su ./Core/Src/mag/mmc5983ma_drv.cyclo ./Core/Src/mag/mmc5983ma_drv.d ./Core/Src/mag/mmc5983ma_drv.o ./Core/Src/mag/mmc5983ma_drv.su
 
 .PHONY: clean-Core-2f-Src-2f-mag
 

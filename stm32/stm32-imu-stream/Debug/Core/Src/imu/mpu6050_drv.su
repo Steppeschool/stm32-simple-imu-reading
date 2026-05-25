@@ -1,10 +1,10 @@
 ../Core/Src/imu/mpu6050_drv.c:20:33:to_mpu	16	static
 ../Core/Src/imu/mpu6050_drv.c:25:15:reg_read	32	static
 ../Core/Src/imu/mpu6050_drv.c:30:15:reg_write_byte	24	static
-../Core/Src/imu/mpu6050_drv.c:37:15:mpu6050_init	24	static
-../Core/Src/imu/mpu6050_drv.c:54:15:mpu6050_deinit	16	static
-../Core/Src/imu/mpu6050_drv.c:60:15:mpu6050_read_raw	32	static
-../Core/Src/imu/mpu6050_drv.c:77:15:mpu6050_set_accel_range	24	static
-../Core/Src/imu/mpu6050_drv.c:86:15:mpu6050_set_gyro_range	24	static
-../Core/Src/imu/mpu6050_drv.c:95:15:mpu6050_who_am_i	16	static
-../Core/Src/imu/mpu6050_drv.c:111:6:MPU6050_HandleInit	24	static
+../Core/Src/imu/mpu6050_drv.c:37:15:mpu6050_init	32	static
+../Core/Src/imu/mpu6050_drv.c:53:15:mpu6050_deinit	16	static
+../Core/Src/imu/mpu6050_drv.c:59:15:mpu6050_read_raw	32	static
+../Core/Src/imu/mpu6050_drv.c:76:15:mpu6050_set_accel_range	24	static
+../Core/Src/imu/mpu6050_drv.c:85:15:mpu6050_set_gyro_range	24	static
+../Core/Src/imu/mpu6050_drv.c:94:15:mpu6050_who_am_i	16	static
+../Core/Src/imu/mpu6050_drv.c:110:6:MPU6050_HandleInit	24	static

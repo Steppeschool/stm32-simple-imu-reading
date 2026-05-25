@@ -5,31 +5,31 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../Core/Src/imu/bmi270_config.c \
-../Core/Src/imu/bmi270_drv.c \
 ../Core/Src/imu/icm20948_drv.c \
 ../Core/Src/imu/icm42688_drv.c \
+../Core/Src/imu/imu_hal.c \
 ../Core/Src/imu/ism330dhcx_drv.c \
 ../Core/Src/imu/lsm6dso_drv.c \
-../Core/Src/imu/mpu6050_drv.c 
+../Core/Src/imu/mpu6050_drv.c \
+../Core/Src/imu/mpu9250_drv.c 
 
 OBJS += \
-./Core/Src/imu/bmi270_config.o \
-./Core/Src/imu/bmi270_drv.o \
 ./Core/Src/imu/icm20948_drv.o \
 ./Core/Src/imu/icm42688_drv.o \
+./Core/Src/imu/imu_hal.o \
 ./Core/Src/imu/ism330dhcx_drv.o \
 ./Core/Src/imu/lsm6dso_drv.o \
-./Core/Src/imu/mpu6050_drv.o 
+./Core/Src/imu/mpu6050_drv.o \
+./Core/Src/imu/mpu9250_drv.o 
 
 C_DEPS += \
-./Core/Src/imu/bmi270_config.d \
-./Core/Src/imu/bmi270_drv.d \
 ./Core/Src/imu/icm20948_drv.d \
 ./Core/Src/imu/icm42688_drv.d \
+./Core/Src/imu/imu_hal.d \
 ./Core/Src/imu/ism330dhcx_drv.d \
 ./Core/Src/imu/lsm6dso_drv.d \
-./Core/Src/imu/mpu6050_drv.d 
+./Core/Src/imu/mpu6050_drv.d \
+./Core/Src/imu/mpu9250_drv.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes
@@ -39,7 +39,7 @@ Core/Src/imu/%.o Core/Src/imu/%.su Core/Src/imu/%.cyclo: ../Core/Src/imu/%.c Cor
 clean: clean-Core-2f-Src-2f-imu
 
 clean-Core-2f-Src-2f-imu:
-	-$(RM) ./Core/Src/imu/bmi270_config.cyclo ./Core/Src/imu/bmi270_config.d ./Core/Src/imu/bmi270_config.o ./Core/Src/imu/bmi270_config.su ./Core/Src/imu/bmi270_drv.cyclo ./Core/Src/imu/bmi270_drv.d ./Core/Src/imu/bmi270_drv.o ./Core/Src/imu/bmi270_drv.su ./Core/Src/imu/icm20948_drv.cyclo ./Core/Src/imu/icm20948_drv.d ./Core/Src/imu/icm20948_drv.o ./Core/Src/imu/icm20948_drv.su ./Core/Src/imu/icm42688_drv.cyclo ./Core/Src/imu/icm42688_drv.d ./Core/Src/imu/icm42688_drv.o ./Core/Src/imu/icm42688_drv.su ./Core/Src/imu/ism330dhcx_drv.cyclo ./Core/Src/imu/ism330dhcx_drv.d ./Core/Src/imu/ism330dhcx_drv.o ./Core/Src/imu/ism330dhcx_drv.su ./Core/Src/imu/lsm6dso_drv.cyclo ./Core/Src/imu/lsm6dso_drv.d ./Core/Src/imu/lsm6dso_drv.o ./Core/Src/imu/lsm6dso_drv.su ./Core/Src/imu/mpu6050_drv.cyclo ./Core/Src/imu/mpu6050_drv.d ./Core/Src/imu/mpu6050_drv.o ./Core/Src/imu/mpu6050_drv.su
+	-$(RM) ./Core/Src/imu/icm20948_drv.cyclo ./Core/Src/imu/icm20948_drv.d ./Core/Src/imu/icm20948_drv.o ./Core/Src/imu/icm20948_drv.su ./Core/Src/imu/icm42688_drv.cyclo ./Core/Src/imu/icm42688_drv.d ./Core/Src/imu/icm42688_drv.o ./Core/Src/imu/icm42688_drv.su ./Core/Src/imu/imu_hal.cyclo ./Core/Src/imu/imu_hal.d ./Core/Src/imu/imu_hal.o ./Core/Src/imu/imu_hal.su ./Core/Src/imu/ism330dhcx_drv.cyclo ./Core/Src/imu/ism330dhcx_drv.d ./Core/Src/imu/ism330dhcx_drv.o ./Core/Src/imu/ism330dhcx_drv.su ./Core/Src/imu/lsm6dso_drv.cyclo ./Core/Src/imu/lsm6dso_drv.d ./Core/Src/imu/lsm6dso_drv.o ./Core/Src/imu/lsm6dso_drv.su ./Core/Src/imu/mpu6050_drv.cyclo ./Core/Src/imu/mpu6050_drv.d ./Core/Src/imu/mpu6050_drv.o ./Core/Src/imu/mpu6050_drv.su ./Core/Src/imu/mpu9250_drv.cyclo ./Core/Src/imu/mpu9250_drv.d ./Core/Src/imu/mpu9250_drv.o ./Core/Src/imu/mpu9250_drv.su
 
 .PHONY: clean-Core-2f-Src-2f-imu
 

@@ -1,7 +1,7 @@
 ../Core/Src/imu/lsm6dso_drv.c:29:33:to_lsm	16	static
 ../Core/Src/imu/lsm6dso_drv.c:34:15:reg_read	32	static
 ../Core/Src/imu/lsm6dso_drv.c:39:15:reg_write_byte	24	static
-../Core/Src/imu/lsm6dso_drv.c:46:15:lsm6dso_init	24	static
+../Core/Src/imu/lsm6dso_drv.c:46:15:lsm6dso_init	32	static
 ../Core/Src/imu/lsm6dso_drv.c:65:15:lsm6dso_deinit	16	static
 ../Core/Src/imu/lsm6dso_drv.c:72:15:lsm6dso_read_raw	32	static
 ../Core/Src/imu/lsm6dso_drv.c:88:15:lsm6dso_set_accel_range	24	static
